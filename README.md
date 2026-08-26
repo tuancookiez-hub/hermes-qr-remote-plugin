@@ -5,7 +5,33 @@ your desktop's Hermes sessions from the phone browser — live streaming replies
 tool activity, stop — for as long as Hermes desktop is running. No rescan, no
 cloud relay: the sidecar binds your Tailscale interface and nothing else.
 
-![status](https://img.shields.io/badge/hermes-plugin-blue) ![tests](https://github.com/tuancookiez-hub/hermes-qr-remote-plugin/actions/workflows/tests.yml/badge.svg)
+![author](https://img.shields.io/badge/author-Tuan%20Dev-blue) ![status](https://img.shields.io/badge/hermes-plugin-purple) ![tests](https://github.com/tuancookiez-hub/hermes-qr-remote-plugin/actions/workflows/tests.yml/badge.svg)
+
+**Author:** Tuan Dev · [github.com/tuancookiez-hub](https://github.com/tuancookiez-hub)
+
+## ⚡ Easiest install — just tell your agent
+
+Paste this into your Hermes chat (CLI, TUI, or desktop) and it will handle everything:
+
+```text
+Install the Phone Remote plugin for me: run
+  hermes plugins install tuancookiez-hub/hermes-qr-remote-plugin
+Then check the setup prerequisites for me (is Tailscale installed and signed in?
+run `tailscale ip -4` to verify). If anything is missing, walk me through fixing
+it step by step. When ready: restart Hermes desktop once, then guide me through
+scanning the QR from the Mobile Remote pane in the desktop app. The plugin's
+AGENTS.md has full instructions — read it if you need details.
+```
+
+Your agent will:
+1. Install the plugin and verify it loads (`hermes plugins list`)
+2. Check Tailscale on this machine — install/sign-in guidance if needed
+3. Remind you to put Tailscale on your **phone** too (same account)
+4. Restart Hermes desktop so the backend mounts the plugin
+5. Walk you through the QR scan in the **Mobile Remote** pane
+
+> Prefer manual? Run `hermes plugins install tuancookiez-hub/hermes-qr-remote-plugin`,
+> then see [Requirements](#requirements).
 
 ## What it does
 

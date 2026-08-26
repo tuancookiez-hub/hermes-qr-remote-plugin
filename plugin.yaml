@@ -1,8 +1,9 @@
 name: hermes-phone-pairing
-version: 0.3.0
+version: 0.4.0
 manifest_version: 1
 description: "zcode-style QR remote: scan once, control desktop sessions from your phone over Tailscale while Hermes runs."
-author: "tuancookiez-hub"
+author: "Tuan Dev (tuancookiez-hub)"
+homepage: "https://github.com/tuancookiez-hub/hermes-qr-remote-plugin"
 repository: "https://github.com/tuancookiez-hub/hermes-qr-remote-plugin"
 license: "MIT"
 

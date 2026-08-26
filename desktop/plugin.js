@@ -87,6 +87,7 @@ async function call(path, opts) {
 // is the live pairing/device line.
 const qKeyQr = ['pair', 'qr']
 const qKeyStatus = ['pair', 'status']
+const qKeyPrereqs = ['pair', 'prereqs']
 
 // Shared by the page's Stop button and the `Remote: Revoke device` palette
 // command. Always a real server-side revoke (QA-5).
@@ -245,12 +246,23 @@ function RemotePage() {
   const status = usePairStatus()
   const wantQr = useValue($wantQr)
 
+  // Setup prerequisites: Tailscale installed + logged in. Drives the setup
+  // card; the QR query stays disabled until ready so /pair/start never
+  // surfaces a raw error for a fixable environment problem.
+  const prereqs = useQuery({
+    queryKey: qKeyPrereqs,
+    queryFn: () => call('/pair/prereqs'),
+    retry: 1
+  })
+  const prereq = prereqs.data
+  const needsSetup = Boolean(prereq && prereq.ready === false)
+
   const qr = useQuery({
     queryKey: qKeyQr,
     queryFn: () => call('/pair/start', { method: 'POST' }),
     retry: 1,
     staleTime: TOKEN_TTL_SECONDS * 1000,
-    enabled: wantQr
+    enabled: wantQr && !needsSetup
   })
 
   const revoke = useMutation({
@@ -302,6 +314,29 @@ function RemotePage() {
 
   // ── Idle (stopped) view — header + one Start button, nothing else ─────────
   if (!wantQr) {
+    const ts = prereq?.tailscale
+    const setupSteps = [
+      {
+        done: Boolean(ts?.installed),
+        label: 'Install Tailscale on this PC',
+        hint: 'Windows: run  winget install tailscale.tailscale   — or get it at tailscale.com/download'
+      },
+      {
+        done: Boolean(ts?.running),
+        label: 'Sign in to Tailscale (run `tailscale up`)',
+        hint: 'This puts this PC on your private tailnet and gives it a 100.x.y.z address.'
+      },
+      {
+        done: false,
+        label: 'Install Tailscale on your phone (App Store / Play Store)',
+        hint: 'Sign in with the SAME account, then connect. The phone must be on the tailnet to reach this desktop.'
+      },
+      {
+        done: true,
+        label: 'Come back and press Start remote control',
+        hint: 'The QR will contain your tailnet address — reachable only by your own devices.'
+      }
+    ]
     return jsxs('div', { className: 'mx-auto w-full max-w-[560px] px-4 py-8', children: [
       jsxs('div', { className: 'flex items-start gap-3', children: [
         jsx(IconChip, { name: 'device-mobile' }),
@@ -310,20 +345,54 @@ function RemotePage() {
           jsx('p', { className: 'mt-1 text-xs leading-relaxed text-(--ui-text-tertiary)', children: t('subtitle') })
         ]})
       ]}),
-      jsxs('div', {
-        className: cn(
-          'mt-6 flex flex-col items-center gap-3 rounded-xl border border-dashed',
-          'border-(--ui-stroke-secondary) bg-(--ui-bg-secondary) px-6 py-10 text-center'
-        ),
-        children: [
-          jsx(StatusDot, { tone: backendDown ? 'error' : 'idle' }),
-          jsx('div', { className: 'text-sm', children: backendDown ? t('statusError') : t('idleLine') }),
-          backendDown
-            ? jsx('div', { className: 'max-w-[340px] text-xs leading-relaxed text-(--ui-text-quaternary)', children: t('unreachableHint') })
-            : null,
-          jsx(Button, { size: 'sm', onClick: pairNow, children: t('start') })
-        ]
-      })
+      needsSetup
+        ? jsxs('div', {
+            className: cn(
+              'mt-6 rounded-xl border border-dashed',
+              'border-(--ui-stroke-secondary) bg-(--ui-bg-secondary) px-5 py-6'
+            ),
+            children: [
+              jsxs('div', { className: 'flex items-center gap-2', children: [
+                jsx(Codicon, { name: 'shield', className: 'size-4 text-(--ui-text-secondary)' }),
+                jsx('div', { className: 'text-sm font-semibold', children: t('setupTitle') }),
+                prereqs.isFetching ? jsx(GlyphSpinner, {}) : null
+              ]}),
+              jsx('p', { className: 'mt-2 text-xs leading-relaxed text-(--ui-text-tertiary)', children: t('setupBody') }),
+              jsxs('ol', { className: 'mt-4 space-y-3', children:
+                setupSteps.map((s, i) => jsxs('li', { className: 'flex items-start gap-2.5', children: [
+                  s.done
+                    ? jsx(Codicon, { name: 'check', className: 'mt-0.5 size-3.5 shrink-0 text-(--ui-positive)' })
+                    : jsx(Codicon, { name: 'circle-large-outline', className: 'mt-0.5 size-3.5 shrink-0 text-(--ui-text-quaternary)' }),
+                  jsxs('div', { className: 'min-w-0', children: [
+                    jsx('div', { className: cn('text-xs', s.done && 'text-(--ui-text-quaternary) line-through'), children: s.label }),
+                    jsx('div', { className: 'text-[0.6875rem] leading-relaxed text-(--ui-text-quaternary)', children: s.hint })
+                  ]})
+                ]}, i))
+              }),
+              jsxs('div', { className: 'mt-4 flex items-center gap-2', children: [
+                jsx(Button, { size: 'sm', onClick: () => prereqs.refetch(), disabled: prereqs.isFetching, children: t('recheck') }),
+                jsx(Button, {
+                  size: 'sm', variant: 'ghost',
+                  onClick: () => { try { navigator.clipboard.writeText(prereq?.hint || '') } catch {} },
+                  children: t('copyHint')
+                })
+              ]})
+            ]
+          })
+        : jsxs('div', {
+            className: cn(
+              'mt-6 flex flex-col items-center gap-3 rounded-xl border border-dashed',
+              'border-(--ui-stroke-secondary) bg-(--ui-bg-secondary) px-6 py-10 text-center'
+            ),
+            children: [
+              jsx(StatusDot, { tone: backendDown ? 'error' : 'idle' }),
+              jsx('div', { className: 'text-sm', children: backendDown ? t('statusError') : t('idleLine') }),
+              backendDown
+                ? jsx('div', { className: 'max-w-[340px] text-xs leading-relaxed text-(--ui-text-quaternary)', children: t('unreachableHint') })
+                : null,
+              jsx(Button, { size: 'sm', onClick: pairNow, children: t('start') })
+            ]
+          })
     ]})
   }
 
@@ -428,6 +497,10 @@ export default {
         statusStopped: 'Remote control stopped',
         statusError: 'Backend not reachable',
         idleLine: 'Remote control is not running.',
+        setupTitle: 'One-time setup needed',
+        setupBody: 'Phone Remote uses Tailscale so only YOUR devices can reach this desktop — no port forwarding, no cloud relay, nothing exposed to the internet.',
+        recheck: 'Re-check',
+        copyHint: 'Copy setup steps',
         start: 'Start remote control',
         stop: 'Stop',
         refresh: 'Refresh QR',

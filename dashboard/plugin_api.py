@@ -29,6 +29,7 @@ import io
 import logging
 import os
 import pathlib
+import shutil
 import subprocess
 import sys
 import threading
@@ -59,6 +60,57 @@ _sidecar: tuple[PairingService, GatewayProxy, TailscaleServe] | None = None
 _tailnet_ip: str | None = None
 
 
+def _tailscale_ip() -> str | None:
+    """Tailnet IPv4 via `tailscale ip -4`, or None when absent/not logged in."""
+    try:
+        proc = subprocess.run(
+            ["tailscale", "ip", "-4"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    out = (proc.stdout or "").strip()
+    if proc.returncode != 0 or not out:
+        return None
+    return out.splitlines()[0].strip()
+
+
+def _tailscale_installed() -> bool:
+    return shutil.which("tailscale") is not None
+
+
+_SETUP_HINT = (
+    "Tailscale is required: the sidecar binds your tailnet IP so ONLY your "
+    "devices can reach it. One-time setup: "
+    "(1) Install Tailscale on this PC — https://tailscale.com/download "
+    "(Windows: winget install tailscale.tailscale). "
+    "(2) Open the Tailscale app and sign in (or run `tailscale up`). "
+    "(3) Install the Tailscale app on your phone (App Store / Play Store) and "
+    "sign in to the SAME account/tailnet. "
+    "(4) Come back and press Start again."
+)
+
+
+@router.get("/pair/prereqs")
+async def pair_prereqs() -> dict:
+    """Setup prerequisites for the pairing flow (Tailscale presence/login).
+
+    Drives the desktop pane's setup card; never raises.
+    """
+    installed = await asyncio.to_thread(_tailscale_installed)
+    ip = await asyncio.to_thread(_tailscale_ip) if installed else None
+    ready = bool(installed and ip)
+    return {
+        "tailscale": {
+            "installed": installed,
+            "running": ip is not None,
+            "ip": ip,
+        },
+        "ready": ready,
+        "hint": None if ready else _SETUP_HINT,
+    }
+
+
 def _discover_tailnet_ip() -> str:
     """Tailnet IP for the sidecar bind: env override > `tailscale ip -4`."""
     global _tailnet_ip
@@ -68,22 +120,19 @@ def _discover_tailnet_ip() -> str:
     if override:
         _tailnet_ip = override
         return override
+    if not _tailscale_installed():
+        raise HTTPException(status_code=503, detail=_SETUP_HINT)
     try:
         proc = subprocess.run(
             ["tailscale", "ip", "-4"],
             capture_output=True, text=True, timeout=10, check=False,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"could not run `tailscale ip -4` ({exc}); is Tailscale running? "
-                   "Set HERMES_PAIR_BIND to the tailnet IP to override.",
-        ) from exc
+        raise HTTPException(status_code=503, detail=_SETUP_HINT) from exc
     if proc.returncode != 0:
         raise HTTPException(
-            status_code=500,
-            detail=f"`tailscale ip -4` failed ({proc.returncode}): "
-                   f"{proc.stderr.strip() or 'not logged in?'}",
+            status_code=503,
+            detail=_SETUP_HINT + f" (`tailscale ip -4` said: {proc.stderr.strip() or 'not logged in?'})",
         )
     lines = [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
     if not lines:
