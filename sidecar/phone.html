@@ -41,7 +41,7 @@
   header h1 { font-size: 1rem; margin: 0; font-weight: 700; letter-spacing: -.01em; }
   header h1 span { color: var(--accent); }
 
-  /* List toolbar: title + refresh/organize */
+  /* List toolbar: title + refresh/organize, zcode-style */
   .lhead { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 4px; position: relative; }
   .ltitle { font-size: .95rem; font-weight: 700; }
   .ltools { display: flex; gap: 6px; }
@@ -74,7 +74,7 @@
   .fchip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 
   /* Per-row status pill */
-  .spill { font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: .02em; flex-shrink: 0; }
+  .spill { font-size: .68rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; flex-shrink: 0; }
   .spill.run { background: rgba(52,211,153,.14); color: #34d399; }
   .spill.done { background: rgba(148,163,184,.13); color: var(--mut); }
 
@@ -145,7 +145,7 @@
   @keyframes blink { 50% { opacity: 0; } }
   .empty { color: var(--mut); font-size: .82rem; text-align: center; padding: 30px 16px; }
 
-  /* Composer */
+  /* Composer (zcode control surface) */
   #composer { display: none; gap: 10px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--line2); background: var(--bg); align-items: flex-end; }
   #composer.on { display: flex; }
@@ -191,7 +191,7 @@
   #splash .sspin { width: 20px; height: 20px; border: 2.5px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
   @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 
-  /* Failure card: badge + title + explanation + retry */
+  /* Failure card (zcode-style): badge + title + explanation + retry */
   .failcard { max-width: 340px; margin: 60px auto; padding: 28px 24px; text-align: center;
     background: var(--bg2); border: 1px solid var(--line); border-radius: 18px;
     display: flex; flex-direction: column; align-items: center; gap: 12px; }
@@ -311,6 +311,7 @@
   var runs = {};
   var lastCounts = {};   // session_id -> message_count at previous poll
   var hotUntil = {};     // session_id -> ms timestamp while count is growing
+  var connMisses = 0;    // consecutive failed polls before showing offline
   try {
     var vs = JSON.parse(localStorage.getItem("hermes_view") || "{}");
     if (vs.filter) view.filter = vs.filter;
@@ -331,7 +332,7 @@
   }
   setSendIcon("send");
 
-  // ── pair-once: saved link keeps working while desktop runs ──────────
+  // ── zcode pair-once: saved link keeps working while desktop runs ──────────
   function storedSession() {
     try { return localStorage.getItem(LS_KEY) || ""; } catch (e) { return ""; }
   }
@@ -427,7 +428,8 @@
     // Liveness = sidecar-tracked phone stream, or this session's gateway
     // message_count grew recently (turns from desktop/Discord/cron all bump
     // it — closest honest equivalent of server-side truth). Growth holds
-    // the pill ~8s past the last increase so it clears cleanly after a turn.
+    // the pill ~20s past the last increase so short pauses inside a turn
+    // don't flip it to DONE mid-reply.
     if (runs[s.id] != null) return true;
     return (hotUntil[s.id] || 0) > Date.now();
   }
@@ -580,16 +582,21 @@
       sessions.forEach(function (s) {
         if (s.message_count == null || s.id == null) return;
         var prev = lastCounts[s.id];
-        if (prev != null && s.message_count > prev) hotUntil[s.id] = Date.now() + 8000;
+        if (prev != null && s.message_count > prev) hotUntil[s.id] = Date.now() + 20000;
         lastCounts[s.id] = s.message_count;
       });
       return rr.then(function () {
         renderList();
+        connMisses = 0;
         setConn("ok", sessions.length + " session" + (sessions.length === 1 ? "" : "s"));
         return sessions;
       });
     }).catch(function (e) {
-      setConn("err", e.code === 401 ? "pairing expired" : "offline");
+      // One failed poll (e.g. phone briefly dozing between tab switches)
+      // must not flip the header to offline — require two consecutive.
+      if (e && e.code === 401) { setConn("err", "pairing expired"); throw e; }
+      connMisses++;
+      if (connMisses >= 2) setConn("err", "offline");
       throw e;
     });
   }
@@ -611,6 +618,11 @@
     viewList.style.display = "none";
     detail.classList.add("on");
     composer.classList.add("on");
+    // Lock the document: the list's scroll offset otherwise carries over and
+    // pushes this fixed header (with the back button) above the viewport —
+    // the "app scrolls as one page / no back button" bug.
+    document.body.style.overflow = "hidden";
+    window.scrollTo(0, 0);
     currentSession = { id: s.id, messages: [] };
     dTitle.textContent = s.title || s.id;
     streamEl.innerHTML = "";
@@ -632,6 +644,7 @@
     endLive();
     detail.classList.remove("on");
     composer.classList.remove("on");
+    document.body.style.overflow = "";
     viewList.style.display = "";
     currentSession = null;
     clearInterval(msgTimer);
@@ -801,10 +814,21 @@
     composerInput.value = "";
     autoResize();
     beginLive();
+    // "Thinking" feedback from send until the first token arrives (the
+    // model can take seconds before any delta streams).
+    showAct("thinking…", true);
 
     streamChat(sid, { message: text })
       .catch(function (e) {
         if (e && e.name === "AbortError") return;  // stopped on purpose
+        // iOS Safari kills backgrounded SSE fetches with a TypeError
+        // ("Load failed") even when the turn went through fine. Don't
+        // claim failure — the canonical reload below reconciles.
+        if (e && (e.code == null || e.message === "Load failed" || e.message === "network error")) {
+          hint("connection paused — checking…");
+          setTimeout(function () { hint(""); }, 2500);
+          return;
+        }
         hint(e.code === 401 ? "pairing expired" : "send failed (" + (e.message || e.code) + ")");
         setTimeout(function () { hint(""); }, 4000);
       })
