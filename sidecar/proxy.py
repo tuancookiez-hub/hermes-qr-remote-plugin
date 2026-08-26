@@ -15,7 +15,7 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 
-# Read-only in Phase 1; Phase 2: send + stop.
+# Read-only in Phase 1; Phase 2 (zcode control surface): send + stop.
 # Patterns use {param} for a single path segment (deterministic match, no regex).
 ALLOWED_ROUTES: tuple[tuple[str, str], ...] = (
     ("GET", "/api/sessions"),
@@ -64,6 +64,9 @@ class GatewayProxy:
         self._sessions: dict[int, aiohttp.ClientSession] = {}
         if session is not None:
             self._sessions[id(session.loop if hasattr(session, "loop") else 0)] = session
+        # Session ids with an in-flight phone stream whose phone may walk
+        # away; their upstream turns must be allowed to FINISH.
+        self._live_streams: set[str] = set()
 
     async def _http(self) -> aiohttp.ClientSession:
         lid = id(asyncio.get_running_loop())
@@ -97,8 +100,10 @@ class GatewayProxy:
         runs = self._runs_load()
         if running:
             runs[sid] = time.time()
+            self._live_streams.add(sid)
         else:
             runs.pop(sid, None)
+            self._live_streams.discard(sid)
         self._runs_save(runs)
 
     def active_runs(self) -> dict:
@@ -210,13 +215,31 @@ class GatewayProxy:
                      "Cache-Control": "no-cache"},
         )
         await resp.prepare(request)
+        phone_gone = False
         try:
             async for chunk in upstream.content.iter_any():
                 await resp.write(chunk)
             await resp.write_eof()
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
-            pass  # phone walked away; gateway drains its own run
+            # Phone walked away (iOS kills backgrounded SSE fetches). The
+            # upstream turn is ALREADY detached from this response on the
+            # gateway side — but the gateway ALSO watches its client for
+            # disconnects and interrupts the run. Detach first so the model
+            # finishes into the transcript; the phone reconciles on return.
+            phone_gone = True
         finally:
+            if phone_gone:
+                # CRITICAL: keep consuming the upstream SSE until the run
+                # actually finishes (done frame / EOF). Dropping it here
+                # would reset the gateway connection, which the gateway
+                # reads as "SSE client disconnected" and interrupts the
+                # model mid-turn — the "one-word reply" bug. Draining lets
+                # the turn complete and persist to the transcript.
+                try:
+                    async for _ in upstream.content.iter_any():
+                        pass
+                except aiohttp.ClientError:
+                    pass
             upstream.release()
             self.mark_run(sid, False)
         return resp
