@@ -6,7 +6,7 @@ streaming replies, tool activity, stop — for as long as Hermes desktop is
 running. No rescan, no cloud relay: the sidecar binds your Tailscale interface
 and nothing else.
 
-![author](https://img.shields.io/badge/author-Tuan%20Dev-blue) ![status](https://img.shields.io/badge/hermes-plugin-purple) ![version](https://img.shields.io/badge/version-0.4.1-green) ![security scan](https://img.shields.io/badge/plugin%20scan-safe-brightgreen) ![tests](https://github.com/tuancookiez-hub/hermes-qr-remote-plugin/actions/workflows/tests.yml/badge.svg)
+![author](https://img.shields.io/badge/author-Tuan%20Dev-blue) ![status](https://img.shields.io/badge/hermes-plugin-purple) ![version](https://img.shields.io/badge/version-0.4.2-green) ![security scan](https://img.shields.io/badge/plugin%20scan-safe-brightgreen) ![tests](https://github.com/tuancookiez-hub/hermes-qr-remote-plugin/actions/workflows/tests.yml/badge.svg)
 
 **Author:** Tuan Dev · [github.com/tuancookiez-hub](https://github.com/tuancookiez-hub)
 
