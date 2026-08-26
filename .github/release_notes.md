@@ -32,6 +32,9 @@ Or paste the README's agent prompt into your Hermes chat and let it drive.
 
 ## Fixes
 
+- Passes Hermes' plugin security scan on fresh installs (`hermes plugins
+  install` proceeds cleanly; earlier builds were blocked by scanner regexes
+  tripping on docs prose)
 - CI: root `conftest.py` puts the repo root on sys.path so bare `pytest`
   collects tests correctly (#1)
 
