@@ -1,0 +1,11 @@
+{
+  "name": "hermes-phone-pairing",
+  "label": "Phone Pairing (Remote Control)",
+  "description": "zcode-style QR pairing: scan with a phone on the tailnet to view and (Phase 2) control desktop sessions from the phone browser. Backend API for the desktop plugin's Remote Control pane.",
+  "icon": "device-mobile",
+  "version": "0.3.0",
+  "api": "plugin_api.py",
+  "tab": {
+    "hidden": true
+  }
+}

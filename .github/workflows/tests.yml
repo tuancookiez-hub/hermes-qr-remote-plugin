@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install deps
+        run: pip install aiohttp fastapi segno pytest httpx uvicorn
+      - name: Run tests
+        env:
+          HERMES_PAIR_BIND: "127.0.0.1"
+          HERMES_PAIR_ALLOW_LOOPBACK: "1"
+          HERMES_PAIR_LINK_STATE: /tmp/test-link-state.json
+        run: pytest tests/ -q

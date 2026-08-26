@@ -1,0 +1,934 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#101014">
+<link rel="apple-touch-icon" href="/assets/logo.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Hermes Remote</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #101014; --bg2: #16161c; --line: #23232c; --line2: #1b1b22;
+    --text: #ececf1; --mut: #8b8b96; --dim: #5f5f6a;
+    --accent: #6366f1; --accent-press: #4f46e5; --danger: #ef4444;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* Author display rules (.center flex etc.) would otherwise beat the UA
+     [hidden] rule and leave "boot"/"empty" states visible forever. */
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
+    background: rgba(16,16,20,.92); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line2);
+  }
+  header h1 { font-size: 1rem; margin: 0; font-weight: 700; letter-spacing: -.01em; }
+  header h1 span { color: var(--accent); }
+
+  /* List toolbar: title + refresh/organize, zcode-style */
+  .lhead { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 4px; position: relative; }
+  .ltitle { font-size: .95rem; font-weight: 700; }
+  .ltools { display: flex; gap: 6px; }
+  .ltools .iconbtn { width: 30px; height: 30px; border: 1px solid var(--line2); background: var(--panel); color: var(--mut); border-radius: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+  .ltools .iconbtn svg { width: 15px; height: 15px; }
+  .ltools .iconbtn:active { transform: scale(.92); }
+  #organizeBtn.on, #refreshBtn.spin { color: var(--accent); border-color: var(--accent); }
+  #refreshBtn.spin svg { animation: rot 0.9s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  #orgMenu {
+    position: absolute; right: 14px; top: 44px; z-index: 40; width: 232px;
+    background: var(--panel); border: 1px solid var(--line2); border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.45); padding: 10px;
+  }
+  #orgMenu .omtitle { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); margin: 2px 4px 8px; }
+  #orgMenu .omlabel { font-size: .68rem; color: var(--mut); margin: 8px 4px 4px; }
+  #orgMenu .seg { display: flex; background: var(--bg); border: 1px solid var(--line2); border-radius: 10px; padding: 3px; gap: 3px; }
+  #orgMenu .seg button {
+    flex: 1; border: none; background: transparent; color: var(--fg); font: inherit; font-size: .74rem;
+    padding: 5px 4px; border-radius: 7px; cursor: pointer; white-space: nowrap;
+  }
+  #orgMenu .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* Status pills row (All / Running / Pinned) */
+  #pills { display: flex; gap: 6px; padding: 6px 14px 2px; flex-wrap: wrap; }
+  .fchip {
+    border: 1px solid var(--line2); background: var(--panel); color: var(--mut);
+    font: inherit; font-size: .72rem; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+  }
+  .fchip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+  /* Per-row status pill */
+  .spill { font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 999px; letter-spacing: .02em; flex-shrink: 0; }
+  .spill.run { background: rgba(52,211,153,.14); color: #34d399; }
+  .spill.done { background: rgba(148,163,184,.13); color: var(--mut); }
+
+  /* Row pin toggle (bookmark) */
+  .pinbtn { border: none; background: transparent; color: var(--mut); cursor: pointer; padding: 6px; display: flex; align-items: center; }
+  .pinbtn svg { width: 15px; height: 15px; }
+  .pinbtn.on { color: var(--accent); }
+  #conn { font-size: .72rem; display: flex; align-items: center; gap: 6px; color: var(--mut); }
+  #conn .dot { width: 8px; height: 8px; border-radius: 50%; background: #55555f; transition: background .3s; }
+  #conn.ok .dot { background: #34d399; box-shadow: 0 0 0 3px rgba(52,211,153,.12); }
+  #conn.err .dot { background: #f87171; box-shadow: 0 0 0 3px rgba(248,113,113,.12); }
+
+  main { padding: 4px 0 28px; }
+  .center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 48px 24px; text-align: center; }
+  .muted { color: var(--mut); }
+  .hint { font-size: .84rem; }
+
+  /* Session list */
+  #list { list-style: none; margin: 0; padding: 0 8px; }
+  #list li {
+    padding: 13px 10px; border-bottom: 1px solid var(--line2); cursor: pointer;
+    display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline;
+    border-radius: 12px;
+  }
+  #list li:active { background: var(--bg2); }
+  #list li .title { font-size: .93rem; font-weight: 600; line-height: 1.35;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #list li .when { font-size: .7rem; color: var(--dim); justify-self: end; white-space: nowrap; }
+  #list li .prev { grid-column: 1 / 2; font-size: .78rem; color: var(--mut);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #list li .rowtop { display: flex; align-items: center; gap: 8px; min-width: 0; grid-column: 1 / 3; }
+  #list li .rowtop .title { flex: 1; min-width: 0; }
+
+  /* Session detail */
+  #detail { display: none; height: 100dvh; flex-direction: column; }
+  #detail.on { display: flex; }
+  #detail .row {
+    display: flex; align-items: center; gap: 6px;
+    padding: calc(env(safe-area-inset-top) + 8px) 10px 8px;
+    border-bottom: 1px solid var(--line2); background: var(--bg);
+  }
+  .iconbtn {
+    appearance: none; border: 0; background: transparent; color: var(--text);
+    width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex: none;
+  }
+  .iconbtn:active { background: var(--bg2); }
+  .iconbtn svg { width: 22px; height: 22px; }
+  .iconbtn.danger { color: #f87171; }
+  #dTitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: .92rem; font-weight: 650; text-align: center; }
+
+  #stream { flex: 1; overflow-y: auto; padding: 14px 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 88%; padding: 9px 13px; border-radius: 16px; font-size: .87rem; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word; }
+  .msg .role { display: block; font-size: .64rem; margin-bottom: 3px; font-weight: 650; letter-spacing: .02em; }
+  .msg.user { align-self: flex-end; background: linear-gradient(135deg, #4f46e5, #6366f1); color: #fff; border-bottom-right-radius: 6px; }
+  .msg.user .role { color: rgba(255,255,255,.65); }
+  .msg.assistant { align-self: flex-start; background: var(--bg2); border: 1px solid var(--line); border-bottom-left-radius: 6px; }
+  .msg.assistant .role { color: var(--mut); }
+  .msg.system { align-self: center; background: transparent; color: var(--dim); font-size: .72rem; padding: 2px; }
+  .msg pre { margin: 4px 0 0; font-size: .78rem; overflow-x: auto; background: #121218; padding: 8px; border-radius: 8px; }
+  .act { align-self: flex-start; display: flex; align-items: center; gap: 6px;
+    font-size: .72rem; color: var(--mut); padding: 0 4px; max-width: 88%; }
+  .act .spin { width: 11px; height: 11px; border: 2px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite; flex: none; }
+  .msg.live::after { content: "▍"; color: var(--accent); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .empty { color: var(--mut); font-size: .82rem; text-align: center; padding: 30px 16px; }
+
+  /* Composer (zcode control surface) */
+  #composer { display: none; gap: 10px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line2); background: var(--bg); align-items: flex-end; }
+  #composer.on { display: flex; }
+  #composerInput {
+    flex: 1; min-height: 44px; max-height: 132px; resize: none;
+    border-radius: 22px; border: 1px solid var(--line); background: var(--bg2);
+    color: var(--text); padding: 11px 15px; font: inherit; font-size: .92rem; line-height: 1.35;
+  }
+  #composerInput:focus { outline: none; border-color: #3d3d8f; }
+  #composerInput::placeholder { color: var(--dim); }
+  #sendBtn {
+    appearance: none; border: 0; width: 44px; height: 44px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    background: var(--accent); color: #fff; transition: background .2s, transform .1s;
+  }
+  #sendBtn:active { transform: scale(.94); }
+  #sendBtn.stop { background: var(--danger); }
+  #sendBtn svg { width: 20px; height: 20px; }
+  #composerHint { position: absolute; left: 0; right: 0; bottom: calc(100% + 4px);
+    text-align: center; font-size: .72rem; color: var(--mut); pointer-events: none; }
+  #composerWrap { position: relative; flex: 1; display: flex; }
+
+  .spinner { width: 26px; height: 26px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn { appearance: none; border: 0; border-radius: 10px; padding: 10px 18px;
+    font-size: .92rem; font-weight: 600; background: var(--bg2); color: var(--text); cursor: pointer; }
+  .btn.primary { background: var(--accent-press); color: #fff; }
+
+  @media (min-width: 640px) {
+    body { max-width: 480px; margin: 0 auto; border-left: 1px solid var(--line2); border-right: 1px solid var(--line2); }
+  }
+
+  /* Splash: logo + name while connecting; fades once the app is live */
+  #splash {
+    position: fixed; inset: 0; z-index: 100; background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    transition: opacity .4s ease;
+  }
+  #splash.fade { opacity: 0; pointer-events: none; }
+  #splash img { width: 96px; height: 96px; border-radius: 22px;
+    box-shadow: 0 12px 40px rgba(99,102,241,.25); animation: breathe 2.2s ease-in-out infinite; }
+  #splash .sname { font-size: .95rem; font-weight: 700; letter-spacing: -.01em; color: var(--text); }
+  #splash .sspin { width: 20px; height: 20px; border: 2.5px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+  /* Failure card (zcode-style): badge + title + explanation + retry */
+  .failcard { max-width: 340px; margin: 60px auto; padding: 28px 24px; text-align: center;
+    background: var(--bg2); border: 1px solid var(--line); border-radius: 18px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .failcard .badge { font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 999px; }
+  .failcard .badge.red { background: rgba(239,68,68,.14); color: #f87171; }
+  .failcard .badge.grey { background: rgba(139,139,150,.14); color: var(--mut); }
+  .failcard h2 { margin: 0; font-size: 1.02rem; font-weight: 700; }
+  .failcard p { margin: 0; font-size: .82rem; line-height: 1.55; color: var(--mut); }
+  .failcard .detail { font-size: .72rem; color: var(--dim); word-break: break-word; }
+</style>
+</head>
+<body>
+  <div id="splash">
+    <img src="/assets/logo.png" alt="Hermes">
+    <div class="sname">Hermes Remote</div>
+    <div class="sspin"></div>
+  </div>
+
+  <header>
+    <h1>Hermes <span>Remote</span></h1>
+    <div id="conn"><span class="dot"></span><span id="connText">connecting</span></div>
+  </header>
+
+  <main id="viewList">
+    <div class="lhead">
+      <div class="ltitle">Sessions</div>
+      <div class="ltools">
+        <button class="iconbtn" id="refreshBtn" aria-label="Refresh list">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+        </button>
+        <button class="iconbtn" id="organizeBtn" aria-label="Organize list">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        </button>
+      </div>
+      <div id="orgMenu" hidden>
+        <div class="omtitle">Organize sessions</div>
+        <div class="omlabel">Sort by</div>
+        <div class="seg" data-k="sortBy">
+          <button data-v="timeline">Timeline</button>
+          <button data-v="source">By source</button>
+        </div>
+        <div class="omlabel">Order by</div>
+        <div class="seg" data-k="orderBy">
+          <button data-v="last_active">Last active</button>
+          <button data-v="created">Created time</button>
+        </div>
+      </div>
+    </div>
+    <div id="pills">
+      <button class="fchip on" data-f="all">All</button>
+      <button class="fchip" data-f="running">Running</button>
+      <button class="fchip" data-f="pinned">Pinned</button>
+    </div>
+    <div class="center" id="boot"><div class="spinner"></div><div class="hint muted">connecting…</div></div>
+    <ul id="list" hidden></ul>
+    <div class="center muted hint" id="listEmpty" hidden>No sessions yet.</div>
+  </main>
+
+  <div id="detail">
+    <div class="row">
+      <button class="iconbtn" id="back" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <strong id="dTitle"></strong>
+      <button class="iconbtn danger" id="dRevoke" aria-label="Unpair device">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="stream"></div>
+    <div id="composer">
+      <div id="composerWrap">
+        <div id="composerHint"></div>
+        <textarea id="composerInput" rows="1" placeholder="Message"></textarea>
+      </div>
+      <button id="sendBtn" aria-label="Send"></button>
+    </div>
+  </div>
+
+<script>
+// Error trap runs first, in its own scope: any failure in the main script
+// below surfaces in the status line instead of leaving a silent
+// "connecting…" forever.
+(function () {
+  "use strict";
+  function trap(msg) {
+    try { document.getElementById("connText").textContent = msg; } catch (e) {}
+  }
+  window.addEventListener("error", function (e) { trap("err: " + e.message); });
+  window.addEventListener("unhandledrejection", function (e) {
+    trap("promise: " + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  });
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  var TOKEN = new URLSearchParams(location.search).get("t") || "";
+  var q = "";
+  var connEl = document.getElementById("conn");
+  var connText = document.getElementById("connText");
+  var listEl = document.getElementById("list");
+  var listEmpty = document.getElementById("listEmpty");
+  var bootEl = document.getElementById("boot");
+  var streamEl = document.getElementById("stream");
+  var viewList = document.getElementById("viewList");
+  var detail = document.getElementById("detail");
+  var dTitle = document.getElementById("dTitle");
+  var composer = document.getElementById("composer");
+  var composerInput = document.getElementById("composerInput");
+  var composerHint = document.getElementById("composerHint");
+  var sendBtn = document.getElementById("sendBtn");
+  var POLL = 2500;
+  var LS_KEY = "hermes_remote_session";
+  var view = { filter: "all", sortBy: "timeline", orderBy: "last_active" };
+  var pins = [];
+  var runs = {};
+  var lastCounts = {};   // session_id -> message_count at previous poll
+  var hotUntil = {};     // session_id -> ms timestamp while count is growing
+  try {
+    var vs = JSON.parse(localStorage.getItem("hermes_view") || "{}");
+    if (vs.filter) view.filter = vs.filter;
+    if (vs.sortBy) view.sortBy = vs.sortBy;
+    if (vs.orderBy) view.orderBy = vs.orderBy;
+  } catch (e) {}
+  function saveView() {
+    try { localStorage.setItem("hermes_view", JSON.stringify(view)); } catch (e) {}
+  }
+
+  var ICON_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+  var ICON_STOP = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>';
+
+  function setSendIcon(mode) {
+    sendBtn.innerHTML = mode === "stop" ? ICON_STOP : ICON_SEND;
+    sendBtn.className = mode === "stop" ? "stop" : "";
+    sendBtn.setAttribute("aria-label", mode === "stop" ? "Stop" : "Send");
+  }
+  setSendIcon("send");
+
+  // ── zcode pair-once: saved link keeps working while desktop runs ──────────
+  function storedSession() {
+    try { return localStorage.getItem(LS_KEY) || ""; } catch (e) { return ""; }
+  }
+  function rememberSession(tok) {
+    try { localStorage.setItem(LS_KEY, tok); } catch (e) {}
+  }
+  function forgetSession() {
+    try { localStorage.removeItem(LS_KEY); } catch (e) {}
+  }
+
+  function bootWithStored() {
+    q = "t=" + encodeURIComponent(storedSession());
+    loadSessions().then(afterBoot).catch(function (e) {
+      if (e && e.code === 401) { forgetSession(); bootWithLink(); }
+      else { setConn("err", "offline"); showBootError("Could not reach the desktop — retry?"); }
+    });
+  }
+
+  function bootWithLink() {
+    if (!TOKEN) {
+      showBootError("Open this page from your saved pairing link, or scan the QR again.");
+      return;
+    }
+    fetch("/pair/exchange?t=" + encodeURIComponent(TOKEN))
+      .then(function (r) {
+        if (r.status !== 200) throw Object.assign(new Error("Unauthorized"), { code: 401 });
+        return r.json();
+      })
+      .then(function (j) {
+        rememberSession(j.token);
+        q = "t=" + encodeURIComponent(j.token);
+        boot();
+      })
+      .catch(function () {
+        if (!storedSession()) {
+          showBootError("Remote control isn't active. Start it in Hermes desktop (Mobile Remote), then reopen this link.");
+        }
+      });
+  }
+
+  if (storedSession()) bootWithStored(); else bootWithLink();
+
+  function setConn(state, text) {
+    connEl.className = state;
+    connText.textContent = text;
+  }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function api(path, opts) {
+    opts = opts || {};
+    var url = path + (path.indexOf("?") >= 0 ? "&" : "?") + q;
+    var fetchOpts = { method: opts.method || "GET", headers: {} };
+    if (opts.body != null) {
+      fetchOpts.headers["Content-Type"] = "application/json";
+      fetchOpts.body = typeof opts.body === "string" ? opts.body : JSON.stringify(opts.body);
+    }
+    // Step trace in the status line: makes a stalled request visible as
+    // "→ /path…" instead of an eternal generic "connecting…". Aux polls
+    // (runs/pins) stay quiet so the header doesn't flicker every cycle.
+    if (!opts.quiet && path.indexOf("/pair/") !== 0) setConn("", "→ " + path.replace("/api/", ""));
+    return fetch(url, fetchOpts)
+      .then(function (r) {
+        if (!opts.quiet && path.indexOf("/pair/") !== 0) setConn(r.ok ? "ok" : "err", r.status + " " + path.replace("/api/", ""));
+        if (r.status === 401) throw Object.assign(new Error("Unauthorized"), { code: 401 });
+        if (r.status === 403) throw Object.assign(new Error("Forbidden"), { code: 403 });
+        if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { code: r.status });
+        var ct = r.headers.get("content-type") || "";
+        if (r.status === 204 || !ct) return {};
+        return r.json().catch(function () { return {}; });
+      });
+  }
+
+  function revokePairing() {
+    var s = new URLSearchParams(q).get("t") || TOKEN;
+    return fetch("/pair/revoke?t=" + encodeURIComponent(s), { method: "POST" })
+      .then(function (r) { return { revoked: r.ok }; })
+      .catch(function () { return { revoked: false }; });
+  }
+
+  var sessions = [];
+  var currentSession = null;
+
+  var ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5M9 3h6l1 7 3 3H5l3-3z"/></svg>';
+  var ICON_PIN_ON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 17v5M9 3h6l1 7 3 3H5l3-3z"/></svg>';
+
+  function isPinned(id) { return pins.indexOf(id) >= 0; }
+
+  function isRunning(s) {
+    // Liveness = sidecar-tracked phone stream, or this session's gateway
+    // message_count grew recently (turns from desktop/Discord/cron all bump
+    // it — closest honest equivalent to zcode's server truth). Growth holds
+    // the pill ~8s past the last increase so it clears cleanly after a turn.
+    if (runs[s.id] != null) return true;
+    return (hotUntil[s.id] || 0) > Date.now();
+  }
+
+  function togglePin(id, on) {
+    pins = pins.filter(function (p) { return p !== id; });
+    if (on) pins.unshift(id);
+    try { localStorage.setItem("hermes_pins", JSON.stringify(pins)); } catch (e) {}
+    api("/api/pins", { method: "POST", body: { id: id, pinned: on } }).catch(function () {});
+    renderList();
+  }
+
+  function loadPins() {
+    var local = [];
+    try { local = JSON.parse(localStorage.getItem("hermes_pins") || "[]"); } catch (e) {}
+    return api("/api/pins").then(function (j) {
+      var server = j.data || [];
+      var merged = server.slice();
+      local.forEach(function (id) { if (merged.indexOf(id) < 0) merged.push(id); });
+      pins = merged;
+    }).catch(function () { pins = local; });
+  }
+
+  function loadRuns() {
+    return api("/api/runs").then(function (j) { runs = j.data || {}; })
+      .catch(function () { runs = {}; });
+  }
+
+  function applyView(list) {
+    if (view.filter === "pinned") list = list.filter(function (s) { return isPinned(s.id); });
+    else if (view.filter === "running") list = list.filter(isRunning);
+    var key = view.orderBy === "created" ? "started_at" : "last_active";
+    return list.slice().sort(function (a, b) {
+      if (isPinned(a.id) !== isPinned(b.id)) return isPinned(a.id) ? -1 : 1;
+      if (view.sortBy === "source") {
+        var d = String(a.source || "").localeCompare(String(b.source || ""));
+        if (d) return d;
+      }
+      return (Number(b[key]) || 0) - (Number(a[key]) || 0);
+    });
+  }
+
+  function renderList() {
+    listEl.innerHTML = "";
+    var shown = applyView(sessions);
+    listEl.hidden = shown.length === 0;
+    listEmpty.hidden = shown.length !== 0;
+    if (!listEmpty.hidden) listEmpty.textContent =
+      view.filter === "pinned" ? "No pinned sessions yet — tap the pin on a row." :
+      view.filter === "running" ? "Nothing running right now." : "No sessions yet.";
+    shown.forEach(function (s) {
+      var li = el("li");
+      var top = el("div", "rowtop");
+      top.appendChild(el("span", "title", s.title || s.id));
+      top.appendChild(el("span", "spill " + (isRunning(s) ? "run" : "done"), isRunning(s) ? "RUNNING" : "DONE"));
+      var pb = el("button", "pinbtn" + (isPinned(s.id) ? " on" : ""));
+      pb.innerHTML = isPinned(s.id) ? ICON_PIN_ON : ICON_PIN;
+      pb.setAttribute("aria-label", isPinned(s.id) ? "Unpin session" : "Pin session");
+      pb.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        togglePin(s.id, !isPinned(s.id));
+      });
+      top.appendChild(pb);
+      li.appendChild(top);
+      li.appendChild(el("span", "when", ago(s.last_active)));
+      if (s.preview) li.appendChild(el("span", "prev", s.preview.replace(/\s+/g, " ")));
+      li.addEventListener("click", function () { openSession(s); });
+      listEl.appendChild(li);
+    });
+  }
+
+  function ago(ts) {
+    if (typeof ts === "number" && isFinite(ts)) {
+      if (ts <= 0) return "";
+      var ms = ts < 1e12 ? ts * 1000 : ts;
+      var s = Math.floor((Date.now() - ms) / 1000);
+      if (s < 60) return "now";
+      if (s < 3600) return Math.floor(s / 60) + "m";
+      if (s < 86400) return Math.floor(s / 3600) + "h";
+      return Math.floor(s / 86400) + "d";
+    }
+    var d = new Date(ts); if (isNaN(d)) return "";
+    var s2 = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s2 < 60) return "now";
+    if (s2 < 3600) return Math.floor(s2 / 60) + "m";
+    if (s2 < 86400) return Math.floor(s2 / 3600) + "h";
+    return Math.floor(s2 / 86400) + "d";
+  }
+
+  function showBootError(msg, detail, badge) {
+    bootEl.hidden = true;
+    setConn("err", "offline");
+    clearInterval(listTimer); clearInterval(msgTimer);
+    var card = el("div", "failcard");
+    card.appendChild(el("span", "badge " + (badge || "red"), badge === "grey" ? "offline" : "invalid connection"));
+    card.appendChild(el("h2", "", msg));
+    if (detail) card.appendChild(el("p", "detail", detail));
+    var retry = el("button", "btn primary", "Try Again");
+    retry.addEventListener("click", function () { location.reload(); });
+    card.appendChild(retry);
+    viewList.innerHTML = "";
+    viewList.appendChild(card);
+    hideSplash();
+  }
+
+  function hideSplash() {
+    var s = document.getElementById("splash");
+    if (s && !s.classList.contains("fade")) {
+      s.classList.add("fade");
+      setTimeout(function () { if (s.parentNode) s.parentNode.removeChild(s); }, 450);
+    }
+  }
+
+  function nearBottom() {
+    return streamEl.scrollHeight - streamEl.scrollTop - streamEl.clientHeight < 90;
+  }
+  function scrollDown(force) {
+    if (force || nearBottom()) streamEl.scrollTop = streamEl.scrollHeight;
+  }
+
+  function renderStream() {
+    var keep = nearBottom();
+    streamEl.innerHTML = "";
+    if (!currentSession || !currentSession.messages || !currentSession.messages.length) {
+      streamEl.appendChild(el("div", "empty", "No messages yet. Say something below."));
+      return;
+    }
+    currentSession.messages.forEach(function (m) { appendMsg(m.role, m.content); });
+    scrollDown(keep);
+  }
+
+  function appendMsg(role, content) {
+    var c = typeof content === "string" ? content : JSON.stringify(content);
+    if (!c || !c.trim()) return null;
+    var wrap = el("div", "msg " + (role || "system"));
+    if (role !== "system") wrap.appendChild(el("span", "role", role === "user" ? "you" : role));
+    wrap.appendChild(document.createTextNode(c));
+    streamEl.appendChild(wrap);
+    return wrap;
+  }
+
+  function loadSessions() {
+    // Aux polls ride along quietly: runs (sidecar-tracked) + pins. The
+    // header only narrates the sessions call, so no flicker.
+    var rr = api("/api/runs", { quiet: true }).then(function (j) { runs = j.data || {}; }).catch(function () {});
+    return api("/api/sessions").then(function (j) {
+      sessions = j.data || [];
+      // Liveness via count deltas: any turn anywhere bumps its session's
+      // message_count; growth marks it hot for ~8s (one poll cycle + slack).
+      sessions.forEach(function (s) {
+        if (s.message_count == null || s.id == null) return;
+        var prev = lastCounts[s.id];
+        if (prev != null && s.message_count > prev) hotUntil[s.id] = Date.now() + 8000;
+        lastCounts[s.id] = s.message_count;
+      });
+      return rr.then(function () {
+        renderList();
+        setConn("ok", sessions.length + " session" + (sessions.length === 1 ? "" : "s"));
+        return sessions;
+      });
+    }).catch(function (e) {
+      setConn("err", e.code === 401 ? "pairing expired" : "offline");
+      throw e;
+    });
+  }
+
+  function loadMessages(s) {
+    return api("/api/sessions/" + encodeURIComponent(s.id) + "/messages").then(function (j) {
+      currentSession = { id: s.id, messages: j.data || [] };
+      setTitle(s);
+      renderStream();
+    });
+  }
+
+  function setTitle(s) {
+    if (s.title && s.title !== s.id) dTitle.textContent = s.title;
+    else if (!dTitle.textContent || dTitle.textContent.indexOf("session_") === 0) dTitle.textContent = s.title || s.id || dTitle.textContent;
+  }
+
+  function openSession(s) {
+    viewList.style.display = "none";
+    detail.classList.add("on");
+    composer.classList.add("on");
+    currentSession = { id: s.id, messages: [] };
+    dTitle.textContent = s.title || s.id;
+    streamEl.innerHTML = "";
+    streamEl.appendChild(el("div", "center hint muted", "loading…"));
+    hint("");
+    loadMessages(s).catch(function () {
+      streamEl.innerHTML = "";
+      streamEl.appendChild(el("div", "empty", "Could not load this session."));
+    });
+    clearInterval(listTimer);
+    clearInterval(msgTimer);
+    msgTimer = setInterval(function () {
+      // Poll keeps history fresh EXCEPT while a live stream owns the view.
+      if (currentSession && !busy) loadMessages({ id: currentSession.id }).catch(function () {});
+    }, POLL);
+  }
+
+  function backToList() {
+    endLive();
+    detail.classList.remove("on");
+    composer.classList.remove("on");
+    viewList.style.display = "";
+    currentSession = null;
+    clearInterval(msgTimer);
+    listTimer = setInterval(function () { loadSessions().catch(function () {}); }, POLL);
+    loadSessions().catch(function () {});
+  }
+
+  function showExpired() {
+    bootEl.hidden = true;
+    listEl.hidden = true;
+    listEmpty.hidden = true;
+    var card = el("div", "failcard");
+    card.appendChild(el("span", "badge red", "invalid connection"));
+    card.appendChild(el("h2", "", "Connection no longer valid"));
+    card.appendChild(el("p", "", "This link was revoked or replaced. Open Mobile Remote in Hermes desktop and scan the latest QR."));
+    var retry = el("button", "btn primary", "Try Again");
+    retry.addEventListener("click", function () { location.reload(); });
+    card.appendChild(retry);
+    var main = document.getElementById("viewList");
+    main.innerHTML = "";
+    main.appendChild(card);
+    hideSplash();
+    clearInterval(listTimer); clearInterval(msgTimer);
+  }
+
+  function hint(t) { composerHint.textContent = t; }
+
+  // ── Live turn state (one stream at a time) ────────────────────────────────
+  var busy = false;
+  var live = null;   // {el, body, text, act}
+  var ctrl = null;   // AbortController for the SSE fetch
+
+  function endLive() {
+    busy = false;
+    live = null;
+    if (ctrl) { try { ctrl.abort(); } catch (e) {} ctrl = null; }
+    setSendIcon("send");
+  }
+
+  function beginLive() {
+    busy = true;
+    setSendIcon("stop");
+    hint("");
+  }
+
+  function ensureAssistant() {
+    if (live) return live;
+    var wrap = el("div", "msg assistant live");
+    wrap.appendChild(el("span", "role", "assistant"));
+    var body = el("span", "body");
+    wrap.appendChild(body);
+    streamEl.appendChild(wrap);
+    live = { el: wrap, body: body, text: "", act: null };
+    scrollDown(true);
+    return live;
+  }
+
+  function showAct(text, spinning) {
+    var l = ensureAssistant();
+    if (!l.act) {
+      l.act = el("div", "act");
+      var ic = el("span", spinning ? "spin" : "");
+      l.act.appendChild(ic);
+      l.act.appendChild(document.createTextNode(""));
+      streamEl.insertBefore(l.act, l.el.nextSibling);
+      // keep act element attached after the bubble
+      l.actAfter = true;
+    }
+    l.act.firstChild.className = spinning ? "spin" : "";
+    l.act.lastChild.textContent = text;
+    scrollDown(false);
+  }
+
+  function clearAct() {
+    if (live && live.act && live.act.parentNode) live.act.parentNode.removeChild(live.act);
+    if (live) live.act = null;
+  }
+
+  // SSE frame parser: frames are `event: <name>\n` + `data: <json>\n\n`
+  function handleFrame(frame) {
+    var name = "", dataLine = "";
+    frame.split("\n").forEach(function (line) {
+      if (line.indexOf("event:") === 0) name = line.slice(6).trim();
+      else if (line.indexOf("data:") === 0) dataLine += line.slice(5).trim();
+      else if (line.indexOf(":") === 0) { /* keepalive comment */ }
+    });
+    if (!dataLine) return;
+    var p;
+    try { p = JSON.parse(dataLine); } catch (e) { return; }
+    if (name === "run.started") {
+      if (ctrl && p.run_id) ctrl.runId = p.run_id;
+    } else if (name === "message.started") {
+      ensureAssistant();
+    } else if (name === "assistant.delta") {
+      var l = ensureAssistant();
+      if (p.delta) {
+        l.text += p.delta;
+        l.body.textContent = l.text;
+        scrollDown(false);
+      }
+      clearAct();
+    } else if (name === "tool.started") {
+      showAct((p.tool_name || "working") + "…", true);
+    } else if (name === "tool.completed") {
+      showAct("✓ " + (p.tool_name || "done"), false);
+    } else if (name === "tool.failed") {
+      showAct("✗ " + (p.tool_name || "failed"), false);
+    } else if (name === "error") {
+      hint(p.message || "stream error");
+      setTimeout(function () { hint(""); }, 6000);
+    }
+    // run.completed / done handled by stream end (canonical reload follows)
+  }
+
+  // A stream can end with no assistant content and no error frame (e.g. the
+  // model call failed upstream before any delta). Never leave the user
+  // staring at their own message with nothing: say what happened and how
+  // to recover.
+  function markNoReply() {
+    if (live && live.text) return;
+    var wrap = el("div", "msg system");
+    wrap.textContent = "No reply came back — the turn likely failed on the desktop (check Hermes desktop / model for this session), or the connection dropped.";
+    if (streamEl.lastChild && streamEl.lastChild.className.indexOf("empty") >= 0) {
+      streamEl.innerHTML = "";
+    }
+    streamEl.appendChild(wrap);
+    scrollDown(true);
+  }
+
+  function streamChat(sid, body) {
+    ctrl = new AbortController();
+    var url = "/api/sessions/" + encodeURIComponent(sid) + "/chat/stream" + (q ? "?" + q : "");
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal
+    }).then(function (r) {
+      if (r.status === 401) throw Object.assign(new Error("Unauthorized"), { code: 401 });
+      if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { code: r.status });
+      var reader = r.body.getReader();
+      var dec = new TextDecoder();
+      var buf = "";
+      function pump() {
+        return reader.read().then(function (res) {
+          if (res.done) return;
+          buf += dec.decode(res.value, { stream: true });
+          var idx;
+          while ((idx = buf.indexOf("\n\n")) >= 0) {
+            handleFrame(buf.slice(0, idx));
+            buf = buf.slice(idx + 2);
+          }
+          return pump();
+        });
+      }
+      return pump();
+    });
+  }
+
+  function sendMessage() {
+    var text = composerInput.value.trim();
+    if (!text || !currentSession || busy) return;
+    var sid = currentSession.id;
+    currentSession.messages.push({ role: "user", content: text });
+    var keep = true;
+    renderStream();
+    composerInput.value = "";
+    autoResize();
+    beginLive();
+
+    streamChat(sid, { message: text })
+      .catch(function (e) {
+        if (e && e.name === "AbortError") return;  // stopped on purpose
+        hint(e.code === 401 ? "pairing expired" : "send failed (" + (e.message || e.code) + ")");
+        setTimeout(function () { hint(""); }, 4000);
+      })
+      .then(function () {
+        endLive();
+        markNoReply();
+        // Canonical transcript from the gateway (includes tool frames).
+        return loadMessages({ id: sid }).catch(function () {});
+      });
+  }
+
+  function stopRun() {
+    if (!busy || !currentSession) return;
+    var rid = ctrl && ctrl.runId;
+    hint("stopping…");
+    var stopCall = rid
+      ? api("/v1/runs/" + encodeURIComponent(rid) + "/stop", { method: "POST" }).catch(function () {})
+      : Promise.resolve();
+    stopCall.then(function () {
+      if (ctrl) { try { ctrl.abort(); } catch (e) {} }
+      endLive();
+      hint("");
+      return loadMessages({ id: currentSession.id }).catch(function () {});
+    });
+  }
+
+  function autoResize() {
+    composerInput.style.height = "auto";
+    composerInput.style.height = Math.min(composerInput.scrollHeight, 132) + "px";
+  }
+
+  document.getElementById("back").addEventListener("click", backToList);
+  sendBtn.addEventListener("click", function () { if (busy) stopRun(); else sendMessage(); });
+  document.getElementById("dRevoke").addEventListener("click", function () {
+    revokePairing().then(function () {
+      forgetSession();
+      history.replaceState(null, "", location.pathname);
+      showExpired();
+    });
+  });
+  composerInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  composerInput.addEventListener("input", autoResize);
+
+  // ── List toolbar: refresh / organize / filter pills ──────────────────────
+  var orgMenu = document.getElementById("orgMenu");
+  var organizeBtn = document.getElementById("organizeBtn");
+  organizeBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    orgMenu.hidden = !orgMenu.hidden;
+    organizeBtn.classList.toggle("on", !orgMenu.hidden);
+  });
+  document.addEventListener("click", function (e) {
+    if (!orgMenu.hidden && !orgMenu.contains(e.target)) {
+      orgMenu.hidden = true;
+      organizeBtn.classList.remove("on");
+    }
+  });
+  orgMenu.querySelectorAll(".seg").forEach(function (seg) {
+    var k = seg.getAttribute("data-k");
+    seg.querySelectorAll("button").forEach(function (b) {
+      if (view[k] === b.getAttribute("data-v")) b.classList.add("on");
+      b.addEventListener("click", function () {
+        view[k] = b.getAttribute("data-v");
+        saveView();
+        seg.querySelectorAll("button").forEach(function (x) { x.classList.toggle("on", x === b); });
+        renderList();
+      });
+    });
+  });
+  document.querySelectorAll(".fchip").forEach(function (chip) {
+    if (view.filter === chip.getAttribute("data-f")) chip.classList.add("on");
+    else chip.classList.remove("on");
+    chip.addEventListener("click", function () {
+      view.filter = chip.getAttribute("data-f");
+      saveView();
+      document.querySelectorAll(".fchip").forEach(function (x) { x.classList.toggle("on", x === chip); });
+      renderList();
+    });
+  });
+  var refreshBtn = document.getElementById("refreshBtn");
+  refreshBtn.addEventListener("click", function () {
+    refreshBtn.classList.add("spin");
+    setConn("ok", "refreshing…");
+    Promise.all([loadSessions(), loadRuns()]).catch(function () {}).then(function () {
+      refreshBtn.classList.remove("spin");
+    });
+  });
+
+  // Pull-to-refresh on the list view
+  var startY = 0, pulling = false;
+  document.addEventListener("touchstart", function (e) {
+    if (viewList.style.display === "none") return;
+    startY = e.touches[0].clientY; pulling = true;
+  }, { passive: true });
+  document.addEventListener("touchmove", function (e) {
+    if (!pulling || window.scrollY > 0 || detail.classList.contains("on")) return;
+    if (e.touches[0].clientY - startY > 60) { e.preventDefault(); setConn("ok", "refreshing…"); loadSessions().catch(function () {}); }
+  }, { passive: false });
+
+  var listTimer = null, msgTimer = null;
+
+  function afterBoot() {
+    bootEl.hidden = true;
+    hideSplash();
+    clearInterval(listTimer);
+    listTimer = setInterval(function () { loadSessions().catch(function () {}); }, POLL);
+  }
+
+  function boot() {
+    loadPins().then(function () { return loadSessions(); }).then(afterBoot).catch(function (e) {
+      bootEl.hidden = true;
+      if (e && e.code === 401) { forgetSession(); showExpired(); }
+      else showBootError("Could not reach the desktop — retry?");
+    });
+  }
+
+  // Saved-link reopen lands here with NO ?t: only fatal when nothing can auth.
+  if (!TOKEN && !storedSession()) {
+    setConn("err", "no link");
+    showBootError("No pairing found. Scan the QR in Hermes desktop first.");
+  }
+})();
+</script>
+</body>
+</html>

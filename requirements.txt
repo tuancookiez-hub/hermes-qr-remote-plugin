@@ -1,0 +1,3 @@
+aiohttp>=3.9
+fastapi>=0.110
+segno>=1.5

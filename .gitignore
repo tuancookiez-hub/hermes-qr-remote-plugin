@@ -1,0 +1,9 @@
+# Runtime state (created next to the plugin after install)
+link_state.json
+active_runs.json
+pins.json
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

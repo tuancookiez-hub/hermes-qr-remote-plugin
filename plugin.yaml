@@ -1,0 +1,19 @@
+name: hermes-phone-pairing
+version: 0.3.0
+manifest_version: 1
+description: "zcode-style QR remote: scan once, control desktop sessions from your phone over Tailscale while Hermes runs."
+author: "tuancookiez-hub"
+repository: "https://github.com/tuancookiez-hub/hermes-qr-remote-plugin"
+license: "MIT"
+
+# Dashboard/backend extension: mounts dashboard/manifest.json (plugin_api.py
+# FastAPI router + QR sidecar). The desktop half ships as desktop/plugin.js,
+# which the desktop app loads from the unified plugins/<name>/desktop door.
+python_dependencies:
+  - aiohttp>=3.9
+  - fastapi>=0.110
+  - segno>=1.5
+
+# The sidecar only ever binds the tailnet interface; loopback bind for dev
+# is opt-in via HERMES_PAIR_ALLOW_LOOPBACK=1. No secrets required.
+requires_env: []
