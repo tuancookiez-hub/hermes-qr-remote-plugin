@@ -1,7 +1,7 @@
 """PairingTransport port + TailscaleServe adapter (v1).
 
 The QR pane only ever sees pairing_url(); the transport behind it is swappable
-(RelayDialOut is the future zcode-style adapter). TailscaleServe binds ONLY to
+(RelayDialOut is the future dial-out adapter). TailscaleServe binds ONLY to
 the tailnet interface — never 0.0.0.0 — so nothing is exposed to LAN/WAN.
 """
 from __future__ import annotations
@@ -138,7 +138,7 @@ class TailscaleServe:
         return Path(__file__).resolve().parent / "pins.json"
 
     async def _pins_get(self, request: web.Request) -> web.Response:
-        """Phone-level pinned sessions (view preference, like zcode's)."""
+        """Phone-level pinned sessions (view preference)."""
         if not self.service.check(request.query.get("t")):
             return web.json_response({"error": "unauthorized"}, status=401)
         try:

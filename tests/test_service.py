@@ -1,4 +1,4 @@
-"""Unit tests for PairingService: persistent-link pairing (zcode model).
+"""Unit tests for PairingService: persistent-link pairing (pair-once model).
 
 Semantics (user-directed 2026-08-24): scan once; the saved link keeps working
 on every open while the desktop app runs. Link survives restarts (disk),

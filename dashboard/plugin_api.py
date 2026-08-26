@@ -10,7 +10,7 @@ Owns the pairing sidecar lifecycle for the desktop app:
   ``tailscale ip -4``; override with ``HERMES_PAIR_BIND``, e.g. for tests)
 * ``POST /pair/start``  -> issues a fresh 90s one-time token, builds the
   pairing URL, returns it plus a segno PNG QR as a data-URL. QR refresh
-  (new call) invalidates every previous token, zcode-style.
+  (new call) invalidates every previous token.
 * ``POST /pair/revoke`` -> revokes all outstanding tokens (phone dies)
 * ``GET  /pair/status`` -> ``{paired, connected_at, last_active, sessionCount?, ...}``
   for the sidebar icon (greyed/accent) + the pane's status line
@@ -222,7 +222,7 @@ def _qr_data_url(payload: str) -> str:
 async def pair_start() -> dict:
     """Return the persistent pairing offer: token + URL + QR data-URL.
 
-    Idempotent (zcode model): first call mints the link, every later call —
+    Idempotent (pair-once model): first call mints the link, every later call —
     including after app restarts — returns the SAME link. Refreshing the QR
     never kicks a paired phone; only Revoke does.
     """

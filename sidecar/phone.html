@@ -41,7 +41,7 @@
   header h1 { font-size: 1rem; margin: 0; font-weight: 700; letter-spacing: -.01em; }
   header h1 span { color: var(--accent); }
 
-  /* List toolbar: title + refresh/organize, zcode-style */
+  /* List toolbar: title + refresh/organize */
   .lhead { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 4px; position: relative; }
   .ltitle { font-size: .95rem; font-weight: 700; }
   .ltools { display: flex; gap: 6px; }
@@ -145,7 +145,7 @@
   @keyframes blink { 50% { opacity: 0; } }
   .empty { color: var(--mut); font-size: .82rem; text-align: center; padding: 30px 16px; }
 
-  /* Composer (zcode control surface) */
+  /* Composer */
   #composer { display: none; gap: 10px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--line2); background: var(--bg); align-items: flex-end; }
   #composer.on { display: flex; }
@@ -191,7 +191,7 @@
   #splash .sspin { width: 20px; height: 20px; border: 2.5px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
   @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 
-  /* Failure card (zcode-style): badge + title + explanation + retry */
+  /* Failure card: badge + title + explanation + retry */
   .failcard { max-width: 340px; margin: 60px auto; padding: 28px 24px; text-align: center;
     background: var(--bg2); border: 1px solid var(--line); border-radius: 18px;
     display: flex; flex-direction: column; align-items: center; gap: 12px; }
@@ -331,7 +331,7 @@
   }
   setSendIcon("send");
 
-  // ── zcode pair-once: saved link keeps working while desktop runs ──────────
+  // ── pair-once: saved link keeps working while desktop runs ──────────
   function storedSession() {
     try { return localStorage.getItem(LS_KEY) || ""; } catch (e) { return ""; }
   }
@@ -426,7 +426,7 @@
   function isRunning(s) {
     // Liveness = sidecar-tracked phone stream, or this session's gateway
     // message_count grew recently (turns from desktop/Discord/cron all bump
-    // it — closest honest equivalent to zcode's server truth). Growth holds
+    // it — closest honest equivalent of server-side truth). Growth holds
     // the pill ~8s past the last increase so it clears cleanly after a turn.
     if (runs[s.id] != null) return true;
     return (hotUntil[s.id] || 0) > Date.now();

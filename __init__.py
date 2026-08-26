@@ -1,4 +1,4 @@
-"""Hermes QR Remote — zcode-style phone pairing plugin.
+"""Hermes QR Remote — QR phone-pairing plugin.
 
 Unified package:
 - Agent half: ``dashboard/plugin_api.py`` is mounted by the dashboard/serve

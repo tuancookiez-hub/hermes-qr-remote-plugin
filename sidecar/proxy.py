@@ -15,7 +15,7 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 
-# Read-only in Phase 1; Phase 2 (zcode control surface): send + stop.
+# Read-only in Phase 1; Phase 2: send + stop.
 # Patterns use {param} for a single path segment (deterministic match, no regex).
 ALLOWED_ROUTES: tuple[tuple[str, str], ...] = (
     ("GET", "/api/sessions"),

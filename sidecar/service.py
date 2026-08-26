@@ -1,4 +1,4 @@
-"""PairingService: persistent-link pairing (zcode model).
+"""PairingService: persistent-link pairing (pair-once model).
 
 Model (user-directed 2026-08-24): scan ONCE; the saved link keeps working on
 every open while the Hermes desktop app runs. Concretely:

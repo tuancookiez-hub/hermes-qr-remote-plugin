@@ -1,9 +1,9 @@
 /**
- * Hermes Desktop ↔ Phone Remote Control — Phase 1 pairing page.
+ * Hermes Desktop ↔ Phone Remote Control — pairing page.
  *
- * Layout follows ZCode's "Mobile remote control" dialog 1:1 (per @user's
- * request): header → "Scan from phone" section → status card (status + Stop,
- * "Can't scan?" + Refresh QR / Copy link) → large QR in a dashed frame.
+ * Layout modeled on a classic "Mobile remote control" dialog: header →
+ * "Scan from phone" section → status card (status + Stop, "Can't scan?" +
+ * Refresh QR / Copy link) → large QR in a dashed frame.
  * Icons only, zero emoji, no countdown ring, no badge clutter.
  *
  * A desktop plugin that renders a full "Remote Control" page (sidebar nav row
@@ -83,7 +83,7 @@ async function call(path, opts) {
 }
 
 // One token-issue = one pairing offer. `/pair/start` issues a FRESH token each
-// call (QR refresh invalidates the previous one, zcode-style); `/pair/status`
+// call (QR refresh invalidates the previous one); `/pair/status`
 // is the live pairing/device line.
 const qKeyQr = ['pair', 'qr']
 const qKeyStatus = ['pair', 'status']
@@ -214,7 +214,7 @@ function PairStatusChip() {
   })
 }
 
-/** Large centered QR in a white frame inside a dashed container (zcode). */
+/** Large centered QR in a white frame inside a dashed container. */
 function QrFrame({ qr, t }) {
   const qrSrc = qr.qrDataUrl || null // NEVER a third-party QR service (QA-2)
   return jsx('div', {
@@ -273,7 +273,7 @@ function RemotePage() {
     }
   })
 
-  // Persistent link (zcode pair-once): no countdown, no auto-refresh — the QR
+  // Persistent link (pair-once): no countdown, no auto-refresh — the QR
   // is always the SAME link. `expiresIn: null` from the backend selects this.
   const persistent = qr.data?.persistent === true || qr.data?.expiresIn == null
   const left = useCountdown(
@@ -480,7 +480,7 @@ function RemotePage() {
 export default {
   id: ID, // must match the folder name
   name: 'Phone Remote Control',
-  description: 'zcode-style QR pairing: scan from a phone on the tailnet to see and (later) steer desktop sessions.',
+  description: 'QR Pairing over Tailscale — scan once, then see and steer this desktop\u2019s Hermes sessions from your phone.',
   defaultEnabled: false,
   register(ctx) {
     rest = ctx.rest.bind(ctx)

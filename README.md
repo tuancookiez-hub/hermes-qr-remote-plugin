@@ -1,9 +1,10 @@
 # Hermes QR Remote Plugin
 
-zcode-style **QR pairing for Hermes**: scan once with your phone, then control
-your desktop's Hermes sessions from the phone browser — live streaming replies,
-tool activity, stop — for as long as Hermes desktop is running. No rescan, no
-cloud relay: the sidecar binds your Tailscale interface and nothing else.
+**QR Pairing for Hermes**: scan once with your phone, then view and send
+messages to your desktop's Hermes sessions from the phone browser — live
+streaming replies, tool activity, stop — for as long as Hermes desktop is
+running. No rescan, no cloud relay: the sidecar binds your Tailscale interface
+and nothing else.
 
 ![author](https://img.shields.io/badge/author-Tuan%20Dev-blue) ![status](https://img.shields.io/badge/hermes-plugin-purple) ![tests](https://github.com/tuancookiez-hub/hermes-qr-remote-plugin/actions/workflows/tests.yml/badge.svg)
 
@@ -41,7 +42,7 @@ Your agent will:
   status pills (RUNNING/DONE), filter pills (All / Running / Pinned), pinning,
   refresh + organize menu (sort by timeline/source, order by last-active/created).
 - **Send from the phone** — SSE-streamed replies token-by-token, tool chips,
-  run-scoped Stop button, zcode-style composer (pill input morphing to stop).
+  run-scoped Stop button, pill-input composer that morphs into a stop button.
 - **Logo splash** + official Hermes home-screen icon when added to the iPhone/
   Android home screen (standalone display, no browser chrome).
 

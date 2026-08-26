@@ -1,6 +1,6 @@
 """Runs/pins sidecar endpoints: auth, roundtrip, and live-run tracking.
 
-Covers the zcode-style list features: /api/runs reflects streams in flight
+Covers the list features: /api/runs reflects streams in flight
 (mark_run on stream start/end), /api/pins persists phone-level pins, both
 require a valid session token.
 """
