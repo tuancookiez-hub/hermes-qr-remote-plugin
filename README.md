@@ -20,8 +20,9 @@ Install the Phone Remote plugin for me: run
 Then check the setup prerequisites for me (is Tailscale installed and signed in?
 run `tailscale ip -4` to verify). If anything is missing, walk me through fixing
 it step by step. When ready: restart Hermes desktop once, then guide me through
-scanning the QR from the Mobile Remote pane in the desktop app. The plugin's
-AGENTS.md has full instructions — read it if you need details.
+scanning the QR from the Mobile Remote pane in the desktop app. The plugin
+ships a full agent-installation guide — your agent can read it if it needs
+details.
 ```
 
 Your agent will:

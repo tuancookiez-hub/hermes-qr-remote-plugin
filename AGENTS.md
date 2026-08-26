@@ -44,7 +44,7 @@ hermes plugins list            # shows hermes-phone-pairing
    - Command not found → not installed. Offer:
      - Windows: `winget install tailscale.tailscale`
      - macOS: `brew install --cask tailscale`
-     - Linux: `curl -fsSL https://tailscale.com/install.sh | sh`
+     - Linux: install via the one-line script at tailscale.com/download (run it yourself after reviewing it)
      - Or download from https://tailscale.com/download
 
 2. **Tailscale logged in / connected?** If `tailscale ip -4` errors or is empty,

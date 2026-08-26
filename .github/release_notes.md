@@ -27,7 +27,7 @@ Or paste the README's agent prompt into your Hermes chat and let it drive.
   last-active/created), RUNNING/DONE status pills, pinnable sessions
 - Splash screen with the official Hermes logo; clear failure card on
   invalid connections
-- `AGENTS.md` so *your* agent can install and set everything up for you
+- an agent guide file, so *your* agent can install and set everything up for you
 - Authorship: plugin.yaml/README credit Tuan Dev (tuancookiez-hub)
 
 ## Fixes

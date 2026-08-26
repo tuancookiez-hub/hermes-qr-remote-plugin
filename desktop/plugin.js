@@ -509,7 +509,7 @@ export default {
         copyLink: 'Copy link',
         qrAlt: 'Pairing QR code',
         noQr: 'QR unavailable from the backend — copy the pairing link from the button above instead.',
-        tailnet: host => `served on ${host} via Tailscale · read-only in Phase 1`,
+        tailnet: host => "served on " + host + " via Tailscale · read-only in Phase 1",
         phaseNote: 'Read-only in Phase 1 — control verbs arrive in Phase 2.',
         unreachable: 'Backend not reachable',
         unreachableHint: 'The pairing sidecar didn’t answer. Restart the desktop app (the backend mounts at startup) and make sure the plugin is enabled.'
