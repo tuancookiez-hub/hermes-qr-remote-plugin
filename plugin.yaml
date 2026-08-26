@@ -1,5 +1,5 @@
 name: hermes-phone-pairing
-version: 0.4.0
+version: 0.4.1
 manifest_version: 1
 description: "QR Pairing over Tailscale: scan once with your phone, then view and control your desktop's Hermes sessions from anywhere while Hermes runs."
 author: "Tuan Dev (tuancookiez-hub)"
