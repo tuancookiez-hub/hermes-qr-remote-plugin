@@ -109,7 +109,7 @@
   #list li .rowtop .title { flex: 1; min-width: 0; }
 
   /* Session detail */
-  #detail { display: none; height: 100dvh; flex-direction: column; }
+  #detail { display: none; position: fixed; inset: 0; flex-direction: column; background: var(--bg); z-index: 20; }
   #detail.on { display: flex; }
   #detail .row {
     display: flex; align-items: center; gap: 6px;
