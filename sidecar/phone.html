@@ -777,6 +777,15 @@
   function streamChat(sid, body) {
     ctrl = new AbortController();
     var url = "/api/sessions/" + encodeURIComponent(sid) + "/chat/stream" + (q ? "?" + q : "");
+    var frameCount = 0;
+    var timedOut = false;
+    // If the gateway opens the stream but never sends a frame (model error
+    // before any delta, or a tunnel that swallows SSE), the user stares at
+    // "thinking…" forever. Bail out at 25s so they get an honest answer.
+    var timeoutId = setTimeout(function () {
+      timedOut = true;
+      if (ctrl) ctrl.abort();
+    }, 25000);
     return fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -784,6 +793,9 @@
       signal: ctrl.signal
     }).then(function (r) {
       if (r.status === 401) throw Object.assign(new Error("Unauthorized"), { code: 401 });
+      if (r.status === 403) throw Object.assign(new Error("Forbidden"), { code: 403 });
+      if (r.status === 404) throw Object.assign(new Error("Session not found"), { code: 404 });
+      if (r.status === 503) throw Object.assign(new Error("Remote control not active"), { code: 503 });
       if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { code: r.status });
       var reader = r.body.getReader();
       var dec = new TextDecoder();
@@ -794,6 +806,7 @@
           buf += dec.decode(res.value, { stream: true });
           var idx;
           while ((idx = buf.indexOf("\n\n")) >= 0) {
+            frameCount++;
             handleFrame(buf.slice(0, idx));
             buf = buf.slice(idx + 2);
           }
@@ -801,6 +814,12 @@
         });
       }
       return pump();
+    }).catch(function (e) {
+      if (timedOut) throw Object.assign(new Error("Stream timed out — no reply from desktop in 25s"), { code: "TIMEOUT" });
+      throw e;
+    }).then(function () {
+      clearTimeout(timeoutId);
+      if (frameCount === 0) throw Object.assign(new Error("Empty stream — turn started but nothing came back"), { code: "EMPTY" });
     });
   }
 
@@ -827,6 +846,26 @@
         if (e && (e.code == null || e.message === "Load failed" || e.message === "network error")) {
           hint("connection paused — checking…");
           setTimeout(function () { hint(""); }, 2500);
+          return;
+        }
+        if (e && e.code === "TIMEOUT") {
+          hint("no reply in 25s — check desktop");
+          setTimeout(function () { hint(""); }, 4000);
+          return;
+        }
+        if (e && e.code === "EMPTY") {
+          hint("turn started but nothing came back");
+          setTimeout(function () { hint(""); }, 4000);
+          return;
+        }
+        if (e && e.code === 503) {
+          hint("remote control not active — start it in desktop");
+          setTimeout(function () { hint(""); }, 4000);
+          return;
+        }
+        if (e && e.code === 404) {
+          hint("session not found — reopen the session");
+          setTimeout(function () { hint(""); }, 4000);
           return;
         }
         hint(e.code === 401 ? "pairing expired" : "send failed (" + (e.message || e.code) + ")");
