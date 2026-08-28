@@ -165,7 +165,8 @@
   #sendBtn.stop { background: var(--danger); }
   #sendBtn svg { width: 20px; height: 20px; }
   #composerHint { position: absolute; left: 0; right: 0; bottom: calc(100% + 4px);
-    text-align: center; font-size: .72rem; color: var(--mut); pointer-events: none; }
+    font-size: .68rem; color: var(--mut); text-align: center; pointer-events: none; }
+  .stream-status { font-size: .62rem; color: var(--mut); text-align: center; padding: 4px 14px; min-height: 14px; }
   #composerWrap { position: relative; flex: 1; display: flex; }
 
   .spinner { width: 26px; height: 26px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
@@ -262,6 +263,7 @@
       </button>
     </div>
     <div id="stream"></div>
+    <div id="streamStatus" class="stream-status"></div>
     <div id="composer">
       <div id="composerWrap">
         <div id="composerHint"></div>
@@ -671,6 +673,12 @@
   }
 
   function hint(t) { composerHint.textContent = t; }
+  var lastStreamStatus = "";
+  function setStatus(t) {
+    lastStreamStatus = t;
+    var e = document.getElementById("streamStatus");
+    if (e) e.textContent = t;
+  }
 
   // ── Live turn state (one stream at a time) ────────────────────────────────
   var busy = false;
@@ -836,6 +844,7 @@
     // "Thinking" feedback from send until the first token arrives (the
     // model can take seconds before any delta streams).
     showAct("thinking…", true);
+    setStatus("connecting…");
 
     streamChat(sid, { message: text })
       .catch(function (e) {
@@ -845,35 +854,42 @@
         // claim failure — the canonical reload below reconciles.
         if (e && (e.code == null || e.message === "Load failed" || e.message === "network error")) {
           hint("connection paused — checking…");
+          setStatus("connection paused");
           setTimeout(function () { hint(""); }, 2500);
           return;
         }
         if (e && e.code === "TIMEOUT") {
           hint("no reply in 25s — check desktop");
+          setStatus("timed out");
           setTimeout(function () { hint(""); }, 4000);
           return;
         }
         if (e && e.code === "EMPTY") {
           hint("turn started but nothing came back");
+          setStatus("empty stream");
           setTimeout(function () { hint(""); }, 4000);
           return;
         }
         if (e && e.code === 503) {
           hint("remote control not active — start it in desktop");
+          setStatus("remote control not active");
           setTimeout(function () { hint(""); }, 4000);
           return;
         }
         if (e && e.code === 404) {
           hint("session not found — reopen the session");
+          setStatus("session not found");
           setTimeout(function () { hint(""); }, 4000);
           return;
         }
         hint(e.code === 401 ? "pairing expired" : "send failed (" + (e.message || e.code) + ")");
+        setStatus("error: " + (e.message || e.code));
         setTimeout(function () { hint(""); }, 4000);
       })
       .then(function () {
         endLive();
         markNoReply();
+        setStatus("done — loading transcript…");
         // Canonical transcript from the gateway (includes tool frames).
         return loadMessages({ id: sid }).catch(function () {});
       });
