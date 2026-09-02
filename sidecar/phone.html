@@ -699,9 +699,10 @@
 
   function loadSessions() {
     // Aux polls ride along quietly: runs (sidecar-tracked) + pins. The
-    // header only narrates the sessions call, so no flicker.
+    // sessions call is quiet too — narrating it flashed "→ sessions" over
+    // the header on every poll cycle. Manual refresh narrates itself.
     var rr = api("/api/runs", { quiet: true }).then(function (j) { runs = j.data || {}; }).catch(function () {});
-    return api("/api/sessions").then(function (j) {
+    return api("/api/sessions", { quiet: true }).then(function (j) {
       sessions = j.data || [];
       // Liveness via count deltas: any turn anywhere bumps its session's
       // message_count; growth marks it hot for ~8s (one poll cycle + slack).
@@ -731,7 +732,9 @@
   }
 
   function loadMessages(s) {
-    return api("/api/sessions/" + encodeURIComponent(s.id) + "/messages").then(function (j) {
+    // Quiet: background transcript polls must not narrate in the header
+    // (same flicker class as the sessions poll).
+    return api("/api/sessions/" + encodeURIComponent(s.id) + "/messages", { quiet: true }).then(function (j) {
       currentSession = { id: s.id, messages: j.data || [] };
       setTitle(s);
       renderStream();
