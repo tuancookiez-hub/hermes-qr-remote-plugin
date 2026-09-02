@@ -188,6 +188,14 @@
   .msg { position: relative; }
   li.sess { transition: background .2s; }
   li.sess.sel { background: rgba(61,61,143,.18); }
+  li.phead { display: flex; align-items: center; gap: 7px; list-style: none; padding: 10px 8px 6px;
+    font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--accent); cursor: pointer; user-select: none; -webkit-user-select: none; }
+  li.phead .chev { display: flex; transition: transform .18s ease; }
+  li.phead.closed .chev { transform: rotate(-90deg); }
+  li.phead .pcount { background: rgba(61,61,143,.25); color: var(--fg); border-radius: 999px;
+    font-size: .62rem; padding: 1px 7px; }
+  li.phead.closed + li { border-top-left-radius: 10px; }
   .sessmenu { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: flex-end; z-index: 60; }
   .sessmenu .sheet { width: 100%; background: var(--panel); border-radius: 16px 16px 0 0; padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); }
   .sessmenu .sheet h3 { margin: 0 0 10px; font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -356,6 +364,8 @@
   function saveView() {
     try { localStorage.setItem("hermes_view", JSON.stringify(view)); } catch (e) {}
   }
+  var pinOpen = true;   // collapsible Pinned section state
+  try { pinOpen = localStorage.getItem("hermes_pinopen") !== "0"; } catch (e) {}
 
   var ICON_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
   var ICON_STOP = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>';
@@ -510,12 +520,37 @@
   function renderList() {
     listEl.innerHTML = "";
     var shown = applyView(sessions);
+    // Pinned gets its own collapsible section at the top; the rest render
+    // flat below. The Pinned filter chip already shows only pins, so the
+    // section header would be redundant there.
+    var pinnedShown = view.filter === "pinned" ? shown : shown.filter(function (s) { return isPinned(s.id); });
+    var rest = view.filter === "pinned" ? [] : shown.filter(function (s) { return !isPinned(s.id); });
     listEl.hidden = shown.length === 0;
     listEmpty.hidden = shown.length !== 0;
     if (!listEmpty.hidden) listEmpty.textContent =
-      view.filter === "pinned" ? "No pinned sessions yet — tap the pin on a row." :
+      view.filter === "pinned" ? "No pinned sessions yet — long-press a session to pin it." :
       view.filter === "running" ? "Nothing running right now." : "No sessions yet.";
-    shown.forEach(function (s) {
+    if (pinnedShown.length && view.filter !== "pinned") {
+      var head = el("li", "phead" + (pinOpen ? "" : " closed"));
+      head.setAttribute("role", "button");
+      var chev = el("span", "chev");
+      chev.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+      head.appendChild(chev);
+      head.appendChild(el("span", "", "Pinned"));
+      head.appendChild(el("span", "pcount", String(pinnedShown.length)));
+      head.addEventListener("click", function () {
+        pinOpen = !pinOpen;
+        try { localStorage.setItem("hermes_pinopen", pinOpen ? "1" : "0"); } catch (e) {}
+        renderList();
+      });
+      listEl.appendChild(head);
+    }
+    if (pinOpen || view.filter === "pinned") pinnedShown.forEach(function (s) { listEl.appendChild(rowEl(s)); });
+    rest.forEach(function (s) { listEl.appendChild(rowEl(s)); });
+  }
+
+  function rowEl(s) {
+    {
       var li = el("li");
       var top = el("div", "rowtop");
       top.appendChild(el("span", "title", s.title || s.id));
@@ -551,8 +586,8 @@
       li.addEventListener("touchcancel", clearSel);
       // Desktop/right-click fallback: contextmenu opens the same sheet.
       li.addEventListener("contextmenu", function (ev) { ev.preventDefault(); showSessionMenu(s); });
-      listEl.appendChild(li);
-    });
+      return li;
+    }
   }
 
   function showSessionMenu(s) {
