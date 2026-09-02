@@ -1,7 +1,7 @@
 """PairingTransport port + TailscaleServe adapter (v1).
 
 The QR pane only ever sees pairing_url(); the transport behind it is swappable
-(RelayDialOut is the future dial-out adapter). TailscaleServe binds ONLY to
+(RelayDialOut is the future zcode-style adapter). TailscaleServe binds ONLY to
 the tailnet interface — never 0.0.0.0 — so nothing is exposed to LAN/WAN.
 """
 from __future__ import annotations
@@ -61,7 +61,11 @@ class TailscaleServe:
         return f"http://{self.bind_ip}:{port}/?t={token}"
 
     async def start(self) -> int:
-        app = web.Application()
+        # Images arrive as base64 data URLs inside the chat/stream JSON;
+        # aiohttp's default 1 MB client_max_size would 413 them. 12 MB
+        # mirrors the gateway's 10 MB MAX_REQUEST_BYTES with headroom for
+        # base64 inflation.
+        app = web.Application(client_max_size=12 * 1024 * 1024)
         app.add_routes(
             [
                 web.get("/", self._index),
@@ -138,7 +142,7 @@ class TailscaleServe:
         return Path(__file__).resolve().parent / "pins.json"
 
     async def _pins_get(self, request: web.Request) -> web.Response:
-        """Phone-level pinned sessions (view preference)."""
+        """Phone-level pinned sessions (view preference, like zcode's)."""
         if not self.service.check(request.query.get("t")):
             return web.json_response({"error": "unauthorized"}, status=401)
         try:
