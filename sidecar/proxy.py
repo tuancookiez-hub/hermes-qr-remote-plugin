@@ -22,6 +22,7 @@ ALLOWED_ROUTES: tuple[tuple[str, str], ...] = (
     ("GET", "/api/sessions/{id}/messages"),
     ("POST", "/api/sessions/{id}/chat"),
     ("POST", "/api/sessions/{id}/chat/stream"),
+    ("POST", "/api/sessions/{id}/model"),
     ("GET", "/v1/runs/{run_id}"),
     ("POST", "/v1/runs/{run_id}/stop"),
     ("POST", "/v1/runs/{run_id}/steer"),

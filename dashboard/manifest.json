@@ -3,7 +3,7 @@
   "label": "Phone Pairing (Remote Control)",
   "description": "QR Pairing over Tailscale: scan once with your phone, then view and control this desktop's Hermes sessions from the phone browser. Backend API for the desktop plugin's Remote Control pane.",
   "icon": "device-mobile",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "api": "plugin_api.py",
   "tab": {
     "hidden": true

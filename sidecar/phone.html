@@ -333,6 +333,10 @@
 (function () {
   "use strict";
   var TOKEN = new URLSearchParams(location.search).get("t") || "";
+  // Fallback model for the 403 self-heal: the provider you're signed into
+  // on the desktop (b.aifull) serves this model. The auto-switch locks the
+  // dead session here, then retries the turn.
+  var DEFAULT_MODEL = "glm-5.3-flash";
   var q = "";
   var connEl = document.getElementById("conn");
   var connText = document.getElementById("connText");
@@ -1006,6 +1010,7 @@
     autoResize();
     var shot = pending.slice();
     pending = []; renderThumbs();
+    var retryBody = null;   // set below; reused by the 403 self-heal retry
     beginLive();
     // "Thinking" feedback from send until the first token arrives (the
     // model can take seconds before any delta streams).
@@ -1027,11 +1032,11 @@
           var parts = [];
           if (text) parts.push({ type: "text", text: text });
           urls.forEach(function (u) { parts.push({ type: "image_url", image_url: { url: u } }); });
-          return { message: parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts };
+          return { model: "hermes-agent", message: parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts };
         })
-      : Promise.resolve({ message: text });
+      : Promise.resolve({ model: "hermes-agent", message: text });
 
-    bodyP.then(function (body) { return streamChat(sid, body); })
+    bodyP.then(function (body) { retryBody = body; return streamChat(sid, body); })
       .catch(function (e) {
         if (e && e.name === "AbortError") return;  // stopped on purpose
         // iOS Safari kills backgrounded SSE fetches with a TypeError
@@ -1065,6 +1070,26 @@
           hint("session not found — reopen the session");
           setStatus("session not found");
           setTimeout(function () { hint(""); }, 4000);
+          return;
+        }
+        if (e && e.code === 403) {
+          // Dead stored model (e.g. grok-4.6 with a token that can't use
+          // it): the gateway rejects the whole turn. Self-heal — lock the
+          // session to the working default via /model, then retry once.
+          hint("model blocked — switching to default…");
+          setStatus("model blocked, retrying");
+          api("/api/sessions/" + encodeURIComponent(sid) + "/model", {
+            method: "POST", body: { model: DEFAULT_MODEL }, quiet: true
+          }).then(function () {
+            return streamChat(sid, retryBody);
+          }).then(function () {
+            hint(""); setStatus("");
+          }).catch(function (e2) {
+            if (e2 && e2.name === "AbortError") return;
+            hint("switch failed: " + (e2.message || "still blocked"));
+            setStatus("auto-switch failed");
+            setTimeout(function () { hint(""); }, 5000);
+          });
           return;
         }
         hint(e.code === 401 ? "pairing expired" : "send failed (" + (e.message || e.code) + ")");
